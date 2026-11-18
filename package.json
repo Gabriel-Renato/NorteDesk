@@ -1,0 +1,27 @@
+{
+  "name": "nortedesk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MVP de suporte remoto consentido (estilo AnyDesk)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @nortedesk/protocol && concurrently -n protocol,signaling,desktop -c blue,green,magenta \"npm run build:watch -w @nortedesk/protocol\" \"npm run dev -w @nortedesk/signaling\" \"npm run dev -w @nortedesk/desktop\"",
+    "dev:signaling": "npm run build -w @nortedesk/protocol && npm run dev -w @nortedesk/signaling",
+    "dev:desktop": "npm run build -w @nortedesk/protocol && npm run dev -w @nortedesk/desktop",
+    "build": "npm run build -w @nortedesk/protocol && npm run build -w @nortedesk/signaling && npm run build -w @nortedesk/desktop",
+    "build:protocol": "npm run build -w @nortedesk/protocol",
+    "test": "npm run test -w @nortedesk/protocol && npm run test -w @nortedesk/signaling && npm run test -w @nortedesk/desktop",
+    "dist:win": "npm run build -w @nortedesk/protocol && npm run dist:win -w @nortedesk/desktop",
+    "rebuild:native": "npm run rebuild:native -w @nortedesk/desktop"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

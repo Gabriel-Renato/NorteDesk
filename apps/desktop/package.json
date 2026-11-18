@@ -1,0 +1,77 @@
+{
+  "name": "@nortedesk/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cliente NorteDesk (Electron)",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "rebuild:native": "electron-rebuild -f -w @nut-tree-fork/libnut-win32,@nut-tree-fork/libnut || electron-rebuild -f -w @nut-tree-fork/nut-js || echo \"Rebuild nativo: execute no Windows com Visual Studio Build Tools\"",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "start:electron": "electron ."
+  },
+  "dependencies": {
+    "@nortedesk/protocol": "0.1.0",
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.4.5",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.2",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^3.0.9"
+  },
+  "build": {
+    "appId": "br.com.nortedesk.app",
+    "productName": "NorteDesk",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/@nut-tree-fork/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../../.env.example",
+        "to": "env.example"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "NorteDesk-Setup-${version}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NorteDesk",
+      "uninstallDisplayName": "NorteDesk"
+    }
+  }
+}
