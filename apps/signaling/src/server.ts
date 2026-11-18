@@ -41,8 +41,13 @@ export class SignalingServer {
   start(): Promise<void> {
     return new Promise((resolve) => {
       this.httpServer = createServer((req, res) => {
-        if (req.url === '/health') {
-          res.writeHead(200, { 'content-type': 'application/json' });
+        const pathOnly = (req.url ?? '/').split('?')[0];
+        if (pathOnly === '/health' || pathOnly === '/health/') {
+          // Sem versão, sessões, IPs ou segredos.
+          res.writeHead(200, {
+            'content-type': 'application/json',
+            'cache-control': 'no-store',
+          });
           res.end(JSON.stringify({ ok: true }));
           return;
         }

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatSessionCode, normalizeSessionCode, parseControlEvent } from '@nortedesk/protocol';
 import { SignalingClient, type ConnectionStatus } from '../lib/signaling';
+import {
+  resolveSignalingUrl,
+  signalingConfigMessage,
+} from '../lib/signaling-url';
 import { WebRtcSession, type QualityPreset } from '../lib/webrtc';
 import { ControlSender } from '../lib/control-sender';
 import type { DisplayInfo } from '../../electron/preload';
@@ -13,19 +17,24 @@ interface IncomingRequest {
   guestDisplayName: string;
 }
 
-function signalingUrl(): string {
-  return import.meta.env.VITE_SIGNALING_URL || 'ws://127.0.0.1:8787';
-}
-
 function statusClass(s: ConnectionStatus): string {
   if (s === 'conectado') return 'ok';
-  if (s === 'conectando') return 'warn';
-  if (s === 'erro') return 'err';
+  if (s === 'iniciando') return 'warn';
+  if (s === 'erro' || s === 'erro_config') return 'err';
   return '';
+}
+
+function statusLabel(s: ConnectionStatus, detail: string | null): string {
+  if (s === 'iniciando') return detail || 'Iniciando servidor, aguarde…';
+  if (s === 'erro_config') return 'Erro de configuração';
+  if (s === 'conectado') return 'Servidor: conectado';
+  if (s === 'erro') return detail || 'Erro de conexão';
+  return 'Servidor: desconectado';
 }
 
 export function App() {
   const [connStatus, setConnStatus] = useState<ConnectionStatus>('desconectado');
+  const [connDetail, setConnDetail] = useState<string | null>(null);
   const [role, setRole] = useState<Role>('idle');
   const [code, setCode] = useState<string | null>(null);
   const [codeExpiresAt, setCodeExpiresAt] = useState<number | null>(null);
@@ -86,9 +95,33 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const client = new SignalingClient(signalingUrl());
+    const resolved = resolveSignalingUrl(import.meta.env.VITE_SIGNALING_URL);
+    if (!resolved.ok) {
+      setConnStatus('erro_config');
+      setConnDetail(signalingConfigMessage(resolved.reason));
+      setError(signalingConfigMessage(resolved.reason));
+      return;
+    }
+
+    const client = new SignalingClient(resolved.url);
     signalingRef.current = client;
-    client.onStatus = setConnStatus;
+    client.onStatus = (status, detail) => {
+      setConnStatus(status);
+      setConnDetail(detail ?? null);
+      // Queda do signaling: interrompe controle imediatamente (não restaura ao reconectar).
+      if (status !== 'conectado' && sessionIdRef.current) {
+        controlRef.current?.setEnabled(false);
+        void window.nortedesk?.setControlGranted(false);
+        void window.nortedesk?.releaseAllInput();
+        setControlGranted(false);
+      }
+    };
+    client.onPeerReset = () => {
+      // Novo peerId após reconexão: credenciais/autorização anteriores são inválidas.
+      void endSessionLocal(
+        'Conexão com o servidor foi restabelecida. A sessão anterior encerrou; é necessário novo aceite e nova autorização de controle.',
+      );
+    };
     client.connect();
 
     const rtc = new WebRtcSession(client);
@@ -114,10 +147,11 @@ export function App() {
     rtc.onConnectionState = (state) => {
       setWebrtcState(state);
       if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+        // Sempre libera input e revoga controle localmente; nova sessão exige novo aceite.
         void endSessionLocal(
           state === 'failed'
-            ? 'Falha na conexão WebRTC. Em redes diferentes, configure TURN.'
-            : 'Conexão WebRTC encerrada.',
+            ? 'Falha na conexão WebRTC. STUN sozinho não garante redes diferentes; configure TURN se necessário.'
+            : 'Conexão WebRTC encerrada. Controle remoto foi revogado.',
         );
       }
     };
@@ -378,9 +412,9 @@ export function App() {
             <h1 className="brand">NorteDesk</h1>
             <p className="subtitle">Suporte remoto consentido — visualização e controle sob autorização.</p>
           </div>
-          <div className={`status-pill ${statusClass(connStatus)}`}>
+          <div className={`status-pill ${statusClass(connStatus)}`} title={connDetail ?? undefined}>
             <span className="dot" />
-            Servidor: {connStatus}
+            {statusLabel(connStatus, connDetail)}
           </div>
         </header>
 
@@ -412,9 +446,21 @@ export function App() {
                   </div>
                 </>
               ) : (
-                <button type="button" onClick={() => void startHost()} disabled={connStatus !== 'conectado'}>
-                  Receber suporte
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void startHost()}
+                    disabled={connStatus !== 'conectado'}
+                  >
+                    Receber suporte
+                  </button>
+                  {connStatus === 'iniciando' ? (
+                    <p className="meta">Iniciando servidor, aguarde…</p>
+                  ) : null}
+                  {connStatus === 'erro_config' ? (
+                    <p className="meta">{connDetail}</p>
+                  ) : null}
+                </>
               )}
             </section>
 
@@ -452,6 +498,9 @@ export function App() {
               >
                 Solicitar acesso
               </button>
+              {connStatus === 'iniciando' ? (
+                <p className="meta">Iniciando servidor, aguarde…</p>
+              ) : null}
             </section>
           </div>
         ) : null}

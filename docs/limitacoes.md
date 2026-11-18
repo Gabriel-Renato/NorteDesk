@@ -20,6 +20,12 @@
 - WebRTC LAN e WAN com coturn.
 - Comportamento sob perda de rede e kill forçado do processo.
 
+## Render / rede
+
+- TURN **não** está configurado: conexão entre redes diferentes **não garantida**.
+- URL pública WSS do Render precisa ser colada em `VITE_SIGNALING_URL` (não inventamos o hostname).
+- Cold start do plano Free: cliente espera/reconecta; sessão em memória some se o dyno reiniciar.
+
 ## Fora do escopo (proposital)
 
 - Acesso não supervisionado, auto-start, serviço.

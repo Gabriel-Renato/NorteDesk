@@ -1,0 +1,33 @@
+# Blueprint de referência para o Web Service de sinalização no Render.
+# Não inclui o cliente Electron (empacotamento Windows é local).
+services:
+  - type: web
+    name: nortedesk-signaling
+    runtime: node
+    plan: free
+    region: oregon
+    # Instala o monorepo, mas não baixa o binário do Electron (só o signaling sobe no Render).
+    buildCommand: ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && npm run build:signaling
+    startCommand: npm run start:signaling
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20.19.5"
+      - key: ELECTRON_SKIP_BINARY_DOWNLOAD
+        value: "1"
+      - key: SIGNALING_HOST
+        value: "0.0.0.0"
+      - key: STUN_URLS
+        value: "stun:stun.l.google.com:19302"
+      # TURN não está provisionado neste MVP. Sem TURN_URLS/TURN_SECRET,
+      # conexões entre redes diferentes NÃO estão garantidas.
+      # - key: TURN_URLS
+      #   value: turn:seu-coturn:3478?transport=udp
+      # - key: TURN_SECRET
+      #   sync: false
+      - key: CODE_TTL_MS
+        value: "600000"
+      - key: HEARTBEAT_INTERVAL_MS
+        value: "15000"
+      - key: HEARTBEAT_TIMEOUT_MS
+        value: "45000"

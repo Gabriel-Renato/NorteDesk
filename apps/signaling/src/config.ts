@@ -12,9 +12,21 @@ function intEnv(name: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/**
+ * Render injeta PORT. Preferimos PORT; SIGNALING_PORT fica para desenvolvimento local.
+ * Host padrão 0.0.0.0 (obrigatório em PaaS).
+ */
+function resolvePort(): number {
+  if (process.env.PORT) {
+    const n = Number.parseInt(process.env.PORT, 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return intEnv('SIGNALING_PORT', 8787);
+}
+
 export const config = {
   host: process.env.SIGNALING_HOST ?? '0.0.0.0',
-  port: intEnv('SIGNALING_PORT', 8787),
+  port: resolvePort(),
   codeTtlMs: intEnv('CODE_TTL_MS', 10 * 60 * 1000),
   maxCodeAttemptsPerIp: intEnv('MAX_CODE_ATTEMPTS_PER_IP', 10),
   codeAttemptWindowMs: intEnv('CODE_ATTEMPT_WINDOW_MS', 60_000),

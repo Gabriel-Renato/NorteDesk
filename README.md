@@ -9,28 +9,25 @@ MVP de **suporte remoto consentido** (fluxo semelhante ao AnyDesk): código temp
 | `apps/desktop` | Cliente Windows (Electron + React + TypeScript + Vite) |
 | `apps/signaling` | Servidor de sinalização WebSocket (Node.js + TypeScript) |
 | `packages/protocol` | Contratos, validação Zod, máquina de estados, coordenadas |
-| `docs/` | Arquitetura, TURN/coturn, roteiro de testes manuais |
+| `docs/` | Arquitetura, TURN/coturn, deploy Render, roteiro de testes |
+| `render.yaml` | Blueprint de referência do Web Service (somente signaling) |
 
 ## Decisão: automação de entrada no Windows
 
 Biblioteca escolhida: **`@nut-tree-fork/nut-js` (4.x, Apache-2.0)**.
 
-- Mantida e usada em projetos Electron.
-- Bindings nativos Windows (`@nut-tree-fork/libnut-win32`).
-- Empacotamento: `asarUnpack` de `node_modules/@nut-tree-fork/**/*`.
-- Se o prebuild não carregar no Electron alvo, rode `npm run rebuild:native` **no Windows** com Visual Studio Build Tools + Windows SDK.
-
-A aplicação de eventos ocorre **somente no processo principal** do Electron, via IPC restrito. O renderer nunca injeta input diretamente.
+- Bindings nativos Windows (`libnut-win32`), empacotados com `asarUnpack`.
+- Eventos aplicados **somente no processo principal** do Electron.
 
 ## Requisitos
 
-- Node.js **20+** (testado com 20.x)
+- Node.js **20.19.x** (fixado em `.node-version` / `.nvmrc` / `engines`; ambiente verificado: **20.19.5**)
 - npm 10+
-- Para **instalador / módulo nativo**: máquina Windows 10/11 x64, Visual Studio Build Tools (C++), Python 3 (node-gyp)
-- Servidor de sinalização acessível pelos dois PCs
-- Para redes diferentes: servidor TURN (coturn) — ver `docs/turn-coturn.md`
+- Para instalador / módulo nativo: Windows 10/11 x64 + Visual Studio Build Tools
+- Servidor de sinalização acessível (local ou Render)
+- Para redes diferentes: **TURN próprio** — ver `docs/turn-coturn.md` (**não incluso** neste MVP)
 
-## Configuração rápida
+## Configuração rápida (local)
 
 ```bash
 cp .env.example .env
@@ -38,99 +35,94 @@ npm install
 npm run build:protocol
 ```
 
-Ajuste no `.env`:
+Variáveis principais (nomes reais):
 
-- `SIGNALING_PORT` / `VITE_SIGNALING_URL` (ex.: `ws://127.0.0.1:8787` ou `ws://IP_LAN:8787`)
-- Opcional: `TURN_URLS`, `TURN_SECRET` (nunca no binário do app)
+| Variável | Onde | Uso |
+|----------|------|-----|
+| `PORT` | Render / PaaS | Porta HTTP/WS (prioridade no servidor) |
+| `SIGNALING_PORT` | Local | Porta quando `PORT` não existe (padrão `8787`) |
+| `SIGNALING_HOST` | Servidor | Bind; use `0.0.0.0` |
+| `VITE_SIGNALING_URL` | Cliente (build Vite) | `ws://127.0.0.1:8787` local ou `wss://…` produção |
+| `STUN_URLS` | Servidor | STUN (não garante redes diferentes) |
+| `TURN_URLS` / `TURN_SECRET` | Servidor | Opcional; **não configurados por padrão** |
+
+Lista completa: `.env.example`.
 
 ## Desenvolvimento
 
-Em um terminal (protocolo + signaling + desktop):
-
 ```bash
-npm run dev
+npm run dev                 # protocolo + signaling + desktop
+npm run dev:signaling       # só servidor
+npm run dev:desktop         # só Electron/Vite
 ```
 
-Ou separado:
+## Build e start (comandos exatos)
 
-```bash
-npm run dev:signaling
-npm run dev:desktop
+| Objetivo | Comando |
+|----------|---------|
+| Protocolo | `npm run build:protocol` |
+| Signaling (protocolo + servidor) | `npm run build:signaling` |
+| Iniciar signaling | `npm run start:signaling` |
+| Desktop (Vite + Electron) | `npm run build -w @nortedesk/desktop` |
+| Testes | `npm test` |
+| Instalador Windows | `npm run rebuild:native` e `npm run dist:win` (**no Windows**) |
+
+Health check do servidor: `GET /health` → HTTP 200 e `{"ok":true}`.
+
+## Deploy no Render (somente signaling)
+
+**Não** execute nem empacote o Electron no Render.
+
+Comandos do serviço:
+
+```text
+Build:  ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && npm run build:signaling
+Start:  npm run start:signaling
 ```
 
-O Vite sobe a UI; o Electron abre automaticamente via `vite-plugin-electron`.
+- Node: `NODE_VERSION=20.19.5`
+- Health Check Path: `/health`
+- O processo escuta `process.env.PORT` em `0.0.0.0`
 
-## Testes automatizados
+Guia completo: [`docs/deploy-render.md`](docs/deploy-render.md).
 
-```bash
-npm test
+### URL no aplicativo
+
+1. Copie a URL pública HTTPS do Render (painel do serviço).
+2. Use a forma WSS no cliente, por exemplo: se a URL for `https://SEU-SERVICO.onrender.com`, configure:
+
+```env
+VITE_SIGNALING_URL=wss://SEU-SERVICO.onrender.com
 ```
 
-Cobre: expiração/uso de códigos, participantes não autorizados, transições inválidas, revogação de controle, validação de mensagens, coordenadas com letterbox/escala, limpeza de teclas/botões, rate-limit.
+**Não inventamos o hostname do seu serviço.** Se ainda não tiver a URL, copie-a do painel do Render antes de gerar o instalador ou apontar o app de desenvolvimento para produção.
 
-## Build e instalador Windows
+No plano Free, cold start é esperado: o app exibe **“Iniciando servidor, aguarde…”** e reconecta com intervalo progressivo.
 
-**Execute no Windows** (WSL/Linux não valida o instalador NSIS nem o binding nativo de forma definitiva):
+## STUN / TURN
 
-```bash
-npm install
-npm run rebuild:native
-npm run dist:win
-```
-
-Artefato em `apps/desktop/release/NorteDesk-Setup-*.exe`.
-
-### Assinatura de código
-
-O instalador gerado por este MVP **não está assinado**. O Windows SmartScreen e o Defender podem exibir avisos em distribuição sem certificado Authenticode. Não afirmamos que o instalador esteja assinado.
-
-## Fluxo do usuário
-
-1. Host: **Receber suporte** → código temporário (copia / validade).
-2. Atendente: informa código + nome → **Solicitar acesso**.
-3. Host: aceita ou recusa (nome é **informado, não verificado**).
-4. Host: escolhe o monitor → inicia compartilhamento.
-5. Host: autoriza controle em passo separado (padrão: desligado).
-6. Qualquer lado encerra; atalho global **Ctrl+Shift+Alt+Esc** força fim e libera teclas/botões.
+- **STUN** padrão: `stun:stun.l.google.com:19302`.
+- **TURN: não está configurado** neste repositório/MVP.
+- Conclusão: conexão na mesma rede tende a funcionar; **entre redes diferentes a mídia WebRTC não está garantida** sem um coturn (ou equivalente) e `TURN_URLS` + `TURN_SECRET` no servidor.
 
 ## Segurança (resumo)
 
 - Sem captura/controle antes do aceite local.
-- Código criptograficamente seguro, com TTL; não concede acesso sozinho.
-- Rate-limit de tentativas e de solicitações; respostas genéricas anti-enumeração.
-- Permissões de visualização e controle separadas; não sobrevivem a reconexão.
-- CSP, `contextIsolation`, sandbox, preload mínimo, bloqueio de navegação/janelas.
-- Produção: use **WSS/HTTPS**; não use WS aberto na internet.
+- Queda de conexão ou reconexão do signaling **revoga controle**, libera teclas/botões e exige novo aceite/autorização.
+- Produção: **WSS/HTTPS**; `contextIsolation`, sandbox, preload mínimo.
 
-## Limitações honestas do MVP
+## Limitações honestas
 
-- Uma sessão / um monitor por vez.
-- Sem acesso não supervisionado, serviço em background, UAC/login screen, arquivos, clipboard, áudio ou gravação.
-- Teclado: mapeamento por `code` (base US + modificadores). **Acentos e IME não têm suporte completo.**
-- Processo em contexto de usuário comum: janelas elevadas podem não receber input.
-- STUN sozinho **não** promete funcionar entre redes arbitrárias — configure TURN.
-- Estado do signaling em memória: reinício do servidor derruba sessões.
-- Ambiente de CI/desenvolvimento atual pode ser Linux/WSL: protocolo e signaling são verificáveis aqui; **automação nativa e instalador dependem de validação em dois PCs Windows**.
-
-## Verificação neste ambiente
-
-Consulte `docs/roteiro-testes-manuais.md` para o checklist entre dois Windows.
-
-O que costuma ser validável sem Windows:
-
-- build TypeScript do monorepo
-- testes unitários de protocolo/signaling
-- subida do servidor de sinalização
-
-O que **depende de Windows + dois PCs**:
-
-- `@nut-tree-fork/nut-js` aplicando mouse/teclado
-- captura `getDisplayMedia` / `desktopCapturer`
-- instalador NSIS e comportamento SmartScreen
-- WebRTC real (LAN e WAN+TURN)
+- Sem TURN provisionado → WAN não garantida.
+- Sem acesso não supervisionado, UAC, arquivos, clipboard, áudio.
+- Teclado/IME parcial; processo usuário comum.
+- Estado do signaling em memória (reinício do Render encerra sessões).
+- Instalador Windows **não assinado**.
 
 ## Documentação adicional
 
+- [Deploy Render](docs/deploy-render.md)
 - [Arquitetura](docs/arquitetura.md)
 - [TURN / coturn](docs/turn-coturn.md)
 - [Roteiro de testes manuais](docs/roteiro-testes-manuais.md)
+- [Limitações](docs/limitacoes.md)
