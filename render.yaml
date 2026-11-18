@@ -8,7 +8,8 @@ services:
     region: oregon
     # Instala o monorepo, mas não baixa o binário do Electron (só o signaling sobe no Render).
     buildCommand: ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && npm run build:signaling
-    startCommand: npm run start:signaling
+    # Caminho absoluto ao artifact — evita "npm start" genérico / Electron no Linux.
+    startCommand: node apps/signaling/dist/index.js
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION

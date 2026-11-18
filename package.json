@@ -14,7 +14,8 @@
     "build": "npm run build -w @nortedesk/protocol && npm run build -w @nortedesk/signaling && npm run build -w @nortedesk/desktop",
     "build:protocol": "npm run build -w @nortedesk/protocol",
     "build:signaling": "npm run build -w @nortedesk/protocol && npm run build -w @nortedesk/signaling",
-    "start:signaling": "npm run start -w @nortedesk/signaling",
+    "start": "node apps/signaling/dist/index.js",
+    "start:signaling": "node apps/signaling/dist/index.js",
     "test": "npm run test -w @nortedesk/protocol && npm run test -w @nortedesk/signaling && npm run test -w @nortedesk/desktop",
     "dist:win": "npm run build -w @nortedesk/protocol && npm run dist:win -w @nortedesk/desktop",
     "rebuild:native": "npm run rebuild:native -w @nortedesk/desktop"

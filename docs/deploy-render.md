@@ -7,8 +7,10 @@ O Web Service no Render deve executar **somente** o servidor de sinalização (`
 | Etapa | Comando |
 |-------|---------|
 | Build | `ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install && npm run build:signaling` |
-| Start | `npm run start:signaling` |
+| Start | `node apps/signaling/dist/index.js` |
 | Health | `GET /health` → `{"ok":true}` |
+
+URL pública deste projeto: `https://nortedesk.onrender.com` → no cliente use `wss://nortedesk.onrender.com`.
 
 Equivalente expandido do build:
 
