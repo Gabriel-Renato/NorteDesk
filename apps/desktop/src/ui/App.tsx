@@ -391,26 +391,23 @@ export function App() {
       {(role === 'host' && peerName) || (role === 'guest' && peerName) ? (
         <div className="banner" role="status">
           <div>
-            <strong>Sessão ativa</strong>
+            <strong>Alguém está conectado</strong>
             {' — '}
             {role === 'host'
-              ? `Compartilhando tela com “${peerName}” (nome informado, não verificado).`
-              : `Visualizando a tela de “${peerName}”.`}
-            {controlGranted
-              ? ' Controle de mouse/teclado autorizado.'
-              : ' Controle desativado.'}
+              ? `${peerName} pode ver sua tela${controlGranted ? ' e controlar o mouse/teclado' : ''}.`
+              : `Você está vendo a tela de ${peerName}${controlGranted ? ' (com controle)' : ' (só olhar)'}.`}
           </div>
           <button type="button" className="danger" onClick={endSession}>
-            Encerrar sessão
+            Encerrar agora
           </button>
         </div>
       ) : null}
 
       <div className="app">
-        <header className="header">
+        <header className="topbar">
           <div>
             <h1 className="brand">NorteDesk</h1>
-            <p className="subtitle">Suporte remoto consentido — visualização e controle sob autorização.</p>
+            <p className="tagline">Ajuda remota com o seu consentimento.</p>
           </div>
           <div className={`status-pill ${statusClass(connStatus)}`} title={connDetail ?? undefined}>
             <span className="dot" />
@@ -422,95 +419,109 @@ export function App() {
         {message ? <div className="alert info">{message}</div> : null}
 
         {role === 'idle' || (role === 'host' && !peerName) || (role === 'guest' && !peerName && !waitingAccept) ? (
-          <div className="grid">
-            <section className="panel">
-              <h2>Receber suporte</h2>
-              <p className="help">
-                Gere um código temporário. O atendente usará esse código e você precisará aceitar a
-                solicitação. O código sozinho não concede acesso.
-              </p>
-              {code ? (
-                <>
-                  <div className="code-row">
-                    <div className="code">{formatSessionCode(code)}</div>
-                    <button type="button" className="secondary" onClick={() => void copyCode()}>
-                      Copiar
+          <>
+            <h2 className="hero-choice">O que você quer fazer?</h2>
+            <div className="grid">
+              <section className="panel accent">
+                <span className="step">Opção 1</span>
+                <h2>Quero receber ajuda</h2>
+                <p className="help">
+                  Clique abaixo, copie o código e envie para quem vai te ajudar. Nada acontece até você
+                  aceitar o pedido.
+                </p>
+                {code ? (
+                  <>
+                    <p className="help" style={{ marginBottom: '0.6rem' }}>
+                      <strong>Seu código:</strong> envie isto para a outra pessoa
+                    </p>
+                    <div className="code-row">
+                      <div className="code">{formatSessionCode(code)}</div>
+                      <button type="button" className="secondary" onClick={() => void copyCode()}>
+                        Copiar
+                      </button>
+                    </div>
+                    <div className="meta">
+                      Expira em {codeTtlLabel ?? '—'}
+                      {' · '}
+                      <button type="button" className="secondary" onClick={refreshCode}>
+                        Gerar outro
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="big"
+                      onClick={() => void startHost()}
+                      disabled={connStatus !== 'conectado'}
+                    >
+                      Gerar meu código
                     </button>
-                  </div>
-                  <div className="meta">
-                    Validade restante: {codeTtlLabel ?? '—'}
-                    {' · '}
-                    <button type="button" className="secondary" onClick={refreshCode}>
-                      Novo código
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => void startHost()}
-                    disabled={connStatus !== 'conectado'}
-                  >
-                    Receber suporte
-                  </button>
-                  {connStatus === 'iniciando' ? (
-                    <p className="meta">Iniciando servidor, aguarde…</p>
-                  ) : null}
-                  {connStatus === 'erro_config' ? (
-                    <p className="meta">{connDetail}</p>
-                  ) : null}
-                </>
-              )}
-            </section>
+                    {connStatus === 'iniciando' ? (
+                      <p className="meta">Conectando ao servidor, aguarde…</p>
+                    ) : null}
+                    {connStatus === 'erro_config' ? (
+                      <p className="meta">{connDetail}</p>
+                    ) : null}
+                    {connStatus === 'desconectado' || connStatus === 'erro' ? (
+                      <p className="meta">Sem conexão com o servidor. Aguarde ou confira a internet.</p>
+                    ) : null}
+                  </>
+                )}
+              </section>
 
-            <section className="panel">
-              <h2>Oferecer suporte</h2>
-              <p className="help">
-                Informe o código do outro computador e um nome. A identidade não é verificada.
-              </p>
-              <div className="field">
-                <label htmlFor="guestName">Seu nome</label>
-                <input
-                  id="guestName"
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  maxLength={64}
-                  placeholder="Ex.: Ana — suporte"
-                  autoComplete="off"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="guestCode">Código do outro computador</label>
-                <input
-                  id="guestCode"
-                  value={guestCode}
-                  onChange={(e) => setGuestCode(e.target.value)}
-                  placeholder="000 000 000"
-                  inputMode="numeric"
-                  autoComplete="off"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={requestAccess}
-                disabled={connStatus !== 'conectado' || waitingAccept}
-              >
-                Solicitar acesso
-              </button>
-              {connStatus === 'iniciando' ? (
-                <p className="meta">Iniciando servidor, aguarde…</p>
-              ) : null}
-            </section>
-          </div>
+              <section className="panel">
+                <span className="step">Opção 2</span>
+                <h2>Vou ajudar alguém</h2>
+                <p className="help">
+                  Digite seu nome e o código que a outra pessoa te enviou. Ela ainda precisa aceitar.
+                </p>
+                <div className="field">
+                  <label htmlFor="guestName">Seu nome</label>
+                  <input
+                    id="guestName"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    maxLength={64}
+                    placeholder="Ex.: Ana"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="guestCode">Código recebido</label>
+                  <input
+                    id="guestCode"
+                    value={guestCode}
+                    onChange={(e) => setGuestCode(e.target.value)}
+                    placeholder="000 000 000"
+                    inputMode="numeric"
+                    autoComplete="off"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="big"
+                  onClick={requestAccess}
+                  disabled={connStatus !== 'conectado' || waitingAccept}
+                >
+                  Pedir para ver a tela
+                </button>
+                {connStatus === 'iniciando' ? (
+                  <p className="meta">Conectando ao servidor, aguarde…</p>
+                ) : null}
+              </section>
+            </div>
+          </>
         ) : null}
 
         {role === 'host' && peerName ? (
           <section className="panel">
-            <h2>Sessão como receptor</h2>
+            <span className="step">Passo seguinte</span>
+            <h2>Compartilhar sua tela</h2>
             <p className="help">
-              Participante: <strong>{peerName}</strong> (nome informado, não verificado). Selecione o
-              monitor e inicie o compartilhamento. O controle permanece desativado até você autorizar.
+              <strong>{peerName}</strong> foi aceito. Escolha o monitor e clique em compartilhar.
+              O controle do mouse/teclado só libera se você autorizar depois.
             </p>
 
             <div className="displays">
@@ -521,7 +532,11 @@ export function App() {
                   className={`display-card ${selectedDisplay?.id === d.id ? 'selected' : ''}`}
                   onClick={() => setSelectedDisplay(d)}
                 >
-                  {d.thumbnailDataUrl ? <img src={d.thumbnailDataUrl} alt="" /> : <div style={{ height: 80 }} />}
+                  {d.thumbnailDataUrl ? (
+                    <img src={d.thumbnailDataUrl} alt="" />
+                  ) : (
+                    <div style={{ height: 80 }} />
+                  )}
                   <span>{d.label}</span>
                 </button>
               ))}
@@ -534,21 +549,21 @@ export function App() {
                   value={quality}
                   onChange={(e) => void onQualityChange(e.target.value as QualityPreset)}
                 >
-                  <option value="baixa">Baixa (720p / 10 fps)</option>
-                  <option value="media">Média (900p / 15 fps)</option>
-                  <option value="alta">Alta (1080p / 20 fps)</option>
+                  <option value="baixa">Economia</option>
+                  <option value="media">Normal</option>
+                  <option value="alta">Alta</option>
                 </select>
               </label>
               <button type="button" onClick={() => void startSharing()}>
-                Iniciar compartilhamento
+                Compartilhar este monitor
               </button>
               {!controlGranted ? (
                 <button type="button" className="secondary" onClick={() => toggleControl(true)}>
-                  Autorizar controle
+                  Permitir controle
                 </button>
               ) : (
                 <button type="button" className="secondary" onClick={() => toggleControl(false)}>
-                  Revogar controle
+                  Tirar controle
                 </button>
               )}
               <button type="button" className="danger" onClick={endSession}>
@@ -556,7 +571,7 @@ export function App() {
               </button>
             </div>
             <div className="meta">
-              WebRTC: {webrtcState}
+              Status da tela: {webrtcState}
               {nativeInfo ? ` · ${nativeInfo}` : ''}
             </div>
           </section>
@@ -564,14 +579,18 @@ export function App() {
 
         {role === 'guest' && (waitingAccept || peerName) ? (
           <section className="panel">
-            <h2>Sessão como atendente</h2>
+            <h2>Ajudando remotamente</h2>
             {waitingAccept ? (
-              <p className="help">Aguardando o usuário local aceitar a solicitação...</p>
+              <div className="waiting-box">
+                Pedido enviado. Espere a outra pessoa clicar em <strong>Aceitar</strong>.
+              </div>
             ) : (
               <>
                 <p className="help">
-                  Computador remoto: <strong>{peerName}</strong>. Controle:{' '}
-                  {controlGranted ? 'autorizado' : 'somente visualização'}.
+                  Tela de <strong>{peerName}</strong>.{' '}
+                  {controlGranted
+                    ? 'Você pode usar mouse e teclado (clique na tela abaixo).'
+                    : 'Por enquanto só dá para ver. Peça para a pessoa permitir o controle.'}
                 </p>
                 <div className="viewer-wrap">
                   <video
@@ -630,13 +649,13 @@ export function App() {
                     }}
                   />
                   {!hasRemoteVideo ? (
-                    <div className="viewer-overlay">Aguardando vídeo remoto...</div>
+                    <div className="viewer-overlay">Aguardando a tela aparecer…</div>
                   ) : null}
                 </div>
                 <div className="session-bar">
-                  <div className="meta">WebRTC: {webrtcState}</div>
+                  <div className="meta">Conexão: {webrtcState}</div>
                   <button type="button" className="danger" onClick={endSession}>
-                    Encerrar sessão
+                    Encerrar
                   </button>
                 </div>
               </>
@@ -645,23 +664,21 @@ export function App() {
         ) : null}
 
         <p className="footnote">
-          Atalho de emergência (global): Ctrl+Shift+Alt+Esc encerra a sessão e libera teclas/botões.
-          Em redes distintas, STUN sozinho pode falhar — use TURN. Distribuição Windows sem assinatura
-          de código pode exibir avisos do SmartScreen.
+          Emergência: Ctrl+Shift+Alt+Esc encerra na hora. Só compartilhe o código com quem você confia.
         </p>
       </div>
 
       {incoming ? (
         <div className="modal-backdrop">
           <div className="modal" role="dialog" aria-modal="true">
-            <h3>Solicitação de acesso</h3>
+            <h3>Alguém quer ver sua tela</h3>
             <p>
-              <strong>{incoming.guestDisplayName}</strong> (nome informado, não verificado) solicita
-              ver a sua tela. Você pode autorizar o controle depois, em passo separado.
+              <strong>{incoming.guestDisplayName}</strong> pediu acesso. O nome não é verificado.
+              Você pode liberar o controle depois, se quiser.
             </p>
             <div className="actions">
               <button type="button" onClick={() => void acceptIncoming()}>
-                Aceitar visualização
+                Aceitar
               </button>
               <button type="button" className="secondary" onClick={rejectIncoming}>
                 Recusar

@@ -4,6 +4,7 @@ import {
   desktopCapturer,
   globalShortcut,
   ipcMain,
+  Menu,
   screen,
   session,
   shell,
@@ -16,6 +17,10 @@ import { InputController } from './input-controller.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !app.isPackaged;
+
+// WSL / GPUs problemáticas: evita janela preta/em branco.
+app.disableHardwareAcceleration();
+Menu.setApplicationMenu(null);
 
 let mainWindow: BrowserWindow | null = null;
 let selectedDisplay: DisplayBounds | null = null;
@@ -35,7 +40,8 @@ function createWindow(): void {
     minHeight: 640,
     title: 'NorteDesk',
     show: false,
-    backgroundColor: '#0f1419',
+    backgroundColor: '#f3f5f8',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -45,7 +51,14 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+    mainWindow?.focus();
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
+    console.error('[nortedesk] falha ao carregar UI', { code, desc, url });
+  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://') || url.startsWith('http://')) {
@@ -61,8 +74,13 @@ function createWindow(): void {
     if (!allowed) event.preventDefault();
   });
 
+  mainWindow.webContents.on('console-message', (_e, level, message) => {
+    console.log(`[renderer:${level}]`, message);
+  });
+
   if (isDev) {
-    void mainWindow.loadURL('http://localhost:5173');
+    void mainWindow.loadURL('http://127.0.0.1:5173');
+    // DevTools sob demanda (F12) — não abrir sozinho pra não cobrir a UI.
   } else {
     void mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }

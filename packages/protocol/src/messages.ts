@@ -196,5 +196,5 @@ export function parseClientMessage(
 }
 
 export function assertMessageSize(raw: string): boolean {
-  return Buffer.byteLength(raw, 'utf8') <= MAX_MESSAGE_BYTES;
+  return new TextEncoder().encode(raw).byteLength <= MAX_MESSAGE_BYTES;
 }

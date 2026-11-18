@@ -1,8 +1,15 @@
-import { randomInt } from 'node:crypto';
+/** Inteiro aleatório seguro — funciona no Node e no renderer (Web Crypto). */
+function secureRandomInt(maxExclusive: number): number {
+  if (maxExclusive <= 0) throw new Error('maxExclusive inválido');
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  // Evita viés grosseiro para o intervalo 1e9 (cabe em 32 bits).
+  return buf[0]! % maxExclusive;
+}
 
 /** Código numérico de 9 dígitos, gerado com fonte criptograficamente segura. */
 export function generateSessionCode(): string {
-  const n = randomInt(0, 1_000_000_000);
+  const n = secureRandomInt(1_000_000_000);
   return n.toString().padStart(9, '0');
 }
 
